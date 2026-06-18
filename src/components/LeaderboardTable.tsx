@@ -1,7 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ChevronDown, SlidersHorizontal } from "lucide-react";
+import { Dropdown } from "@/components/Dropdown";
+import { PlayerModal } from "@/components/PlayerModal";
 import { formatPoints, formatPercent } from "@/lib/format";
+
+const PAGE_SIZE = 20;
 
 export interface LeaderRow {
   id: string;
@@ -32,6 +37,15 @@ function profit(r: LeaderRow): number {
 
 export function LeaderboardTable({ rows }: { rows: LeaderRow[] }) {
   const [sort, setSort] = useState<SortKey>("points");
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  const [openPlayer, setOpenPlayer] = useState<string | null>(null);
+
+  // collapse back to the first page whenever the sort changes (adjust during render)
+  const [prevSort, setPrevSort] = useState(sort);
+  if (prevSort !== sort) {
+    setPrevSort(sort);
+    setVisible(PAGE_SIZE);
+  }
 
   const sorted = useMemo(() => {
     const copy = [...rows];
@@ -59,7 +73,19 @@ export function LeaderboardTable({ rows }: { rows: LeaderRow[] }) {
 
   return (
     <div>
-      <div className="flex flex-wrap gap-2 mb-5">
+      <Dropdown
+        value={sort}
+        onChange={(value) => setSort(value)}
+        ariaLabel="ランキングの並び替え"
+        options={SORTS.map((option) => ({
+          value: option.key,
+          label: `${option.label}順`,
+        }))}
+        icon={<SlidersHorizontal size={18} className="shrink-0 text-ash-gray" />}
+        className="mb-4 sm:hidden"
+      />
+
+      <div className="mb-5 hidden flex-wrap gap-2 sm:flex">
         {SORTS.map((s) => (
           <button
             key={s.key}
@@ -85,13 +111,15 @@ export function LeaderboardTable({ rows }: { rows: LeaderRow[] }) {
         </div>
 
         <div className="divide-y divide-olive-stone">
-          {sorted.map((r, i) => {
+          {sorted.slice(0, visible).map((r, i) => {
             const acc = r.prediction_count > 0 ? formatPercent(accuracy(r)) : "—";
             const pf = profit(r);
             return (
-              <div
+              <button
                 key={r.id}
-                className="grid grid-cols-[2.5rem_1fr_auto] sm:grid-cols-[2.5rem_1fr_6rem_6rem_6rem] gap-3 px-6 py-4 items-center"
+                type="button"
+                onClick={() => setOpenPlayer(r.id)}
+                className="grid w-full grid-cols-[2.5rem_1fr_auto] sm:grid-cols-[2.5rem_1fr_6rem_6rem_6rem] gap-3 px-6 py-4 items-center text-left transition-colors hover:bg-olive-stone/20"
               >
                 <span
                   className={`font-display text-lg tabular-nums ${
@@ -120,7 +148,7 @@ export function LeaderboardTable({ rows }: { rows: LeaderRow[] }) {
                 <span className="text-right font-display tabular-nums">
                   {formatPoints(Number(r.points_balance))}
                 </span>
-              </div>
+              </button>
             );
           })}
           {sorted.length === 0 && (
@@ -130,6 +158,40 @@ export function LeaderboardTable({ rows }: { rows: LeaderRow[] }) {
           )}
         </div>
       </div>
+
+      {sorted.length > PAGE_SIZE && (
+        <div className="mt-5 flex items-center justify-center gap-3">
+          {visible < sorted.length ? (
+            <button
+              type="button"
+              onClick={() => setVisible((v) => Math.min(v + PAGE_SIZE, sorted.length))}
+              className="inline-flex items-center gap-1.5 rounded-[100px] border border-olive-stone px-5 py-2.5 text-sm text-ash-gray transition-colors hover:border-cream-glow hover:text-cream-glow"
+            >
+              もっと見る
+              <ChevronDown size={16} />
+              <span className="tabular-nums opacity-70">
+                {Math.min(visible, sorted.length)}/{sorted.length}
+              </span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setVisible(PAGE_SIZE)}
+              className="rounded-[100px] border border-olive-stone px-5 py-2.5 text-sm text-ash-gray transition-colors hover:border-cream-glow hover:text-cream-glow"
+            >
+              閉じる
+            </button>
+          )}
+        </div>
+      )}
+
+      {openPlayer && (
+        <PlayerModal
+          key={openPlayer}
+          playerId={openPlayer}
+          onClose={() => setOpenPlayer(null)}
+        />
+      )}
     </div>
   );
 }

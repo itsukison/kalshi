@@ -12,6 +12,7 @@ export function Dropdown<T extends string>({
   icon,
   ariaLabel,
   className = "",
+  mobileIconOnly = false,
 }: {
   value: T;
   options: DropdownOption<T>[];
@@ -19,6 +20,7 @@ export function Dropdown<T extends string>({
   icon?: React.ReactNode;
   ariaLabel?: string;
   className?: string;
+  mobileIconOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -90,13 +92,25 @@ export function Dropdown<T extends string>({
         aria-label={ariaLabel}
         onClick={() => setOpen((o) => !o)}
         onKeyDown={onKeyDown}
-        className="flex h-12 w-full items-center gap-2 rounded-[8px] border border-olive-stone bg-void-black px-4 text-sm text-cream-glow outline-none transition-colors hover:border-cream-glow focus:border-cream-glow"
+        className={`flex h-12 w-full items-center rounded-[8px] border border-olive-stone bg-void-black text-sm text-cream-glow outline-none transition-colors hover:border-cream-glow focus:border-cream-glow ${
+          mobileIconOnly ? "justify-center px-0 sm:justify-start sm:gap-2 sm:px-4" : "gap-2 px-4"
+        }`}
       >
         {icon}
-        <span className="flex-1 truncate text-left">{selected?.label}</span>
+        <span
+          className={
+            mobileIconOnly
+              ? "sr-only sm:not-sr-only sm:flex-1 sm:truncate sm:text-left"
+              : "flex-1 truncate text-left"
+          }
+        >
+          {selected?.label}
+        </span>
         <ChevronDown
           size={16}
-          className={`shrink-0 text-ash-gray transition-transform ${open ? "rotate-180" : ""}`}
+          className={`shrink-0 text-ash-gray transition-transform ${
+            mobileIconOnly ? "hidden sm:block" : ""
+          } ${open ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -104,7 +118,9 @@ export function Dropdown<T extends string>({
         <ul
           role="listbox"
           aria-label={ariaLabel}
-          className="absolute z-20 mt-2 w-full overflow-hidden rounded-[8px] border border-olive-stone bg-void-black py-1"
+          className={`absolute z-20 mt-2 overflow-hidden rounded-[8px] border border-olive-stone bg-void-black py-1 ${
+            mobileIconOnly ? "right-0 w-64 sm:w-full" : "w-full"
+          }`}
         >
           {options.map((opt, i) => {
             const isSelected = opt.value === value;
