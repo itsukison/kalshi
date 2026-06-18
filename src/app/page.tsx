@@ -13,14 +13,15 @@ export default async function HomePage() {
 
   return (
     <div>
-      <section className="mb-10">
-        <p className="bracket text-sm text-ash-gray mb-3">FIFA World Cup</p>
-        <h1 className="font-display font-semibold text-5xl md:text-6xl leading-[0.95] tracking-tight max-w-3xl">
-          試合を<span className="text-pulse-green">予測</span>して、
-          <br className="hidden sm:block" />
-          ポイントを稼ごう。
+      <section className="mb-8 sm:mb-10">
+        <p className="bracket mb-3 text-sm text-ash-gray">FIFA World Cup</p>
+        <h1 className="max-w-3xl font-display text-[clamp(2.25rem,10vw,3rem)] font-semibold leading-[1.02] tracking-tight md:text-6xl md:leading-[0.95]">
+          <span className="block whitespace-nowrap">
+            試合を<span className="text-pulse-green">予測</span>して、
+          </span>
+          <span className="block whitespace-nowrap">ポイントを稼ごう。</span>
         </h1>
-        <p className="mt-5 text-ash-gray max-w-xl">
+        <p className="mt-4 max-w-xl text-sm leading-[1.4] text-ash-gray sm:mt-5 sm:text-base">
           YES か NO を選んでポイントを投じる予測マーケット。価格は需要で動き、的中すれば1枚あたり100ポイント。
         </p>
       </section>

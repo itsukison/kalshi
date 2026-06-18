@@ -14,9 +14,9 @@ export default async function LeaderboardPage() {
     .limit(100);
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <p className="bracket text-sm text-ash-gray mb-3">ランキング</p>
-      <h1 className="font-display font-semibold text-4xl md:text-5xl tracking-tight mb-8">
+    <div className="mx-auto max-w-3xl">
+      <p className="bracket mb-3 text-sm text-ash-gray">ランキング</p>
+      <h1 className="mb-6 font-display text-3xl font-semibold tracking-tight sm:mb-8 sm:text-4xl md:text-5xl">
         予測家<span className="text-pulse-green">ランキング</span>
       </h1>
       <LeaderboardTable rows={(data ?? []) as LeaderRow[]} />

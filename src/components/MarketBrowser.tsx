@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
 import { MarketCard, type MarketWithMatch } from "@/components/MarketCard";
 import { Dropdown } from "@/components/Dropdown";
 import { effectiveStatus } from "@/lib/marketStatus";
+
+const PAGE_SIZE = 12;
 
 type FilterKey = "all" | "open" | "closed" | "done";
 type SortKey = "kickoff" | "closing" | "popular" | "underdog" | "movement";
@@ -85,6 +87,15 @@ export function MarketBrowser({ markets }: { markets: MarketWithMatch[] }) {
   const [active, setActive] = useState<FilterKey>("open");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("kickoff");
+  const [visible, setVisible] = useState(PAGE_SIZE);
+
+  // collapse back to the first page whenever the visible set changes (adjust during render)
+  const resetKey = `${active}|${query}|${sort}`;
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (prevResetKey !== resetKey) {
+    setPrevResetKey(resetKey);
+    setVisible(PAGE_SIZE);
+  }
 
   const buckets = useMemo(() => markets.map(bucket), [markets]);
   const counts = useMemo(() => {
@@ -105,8 +116,8 @@ export function MarketBrowser({ markets }: { markets: MarketWithMatch[] }) {
 
   return (
     <div>
-      <div className="mb-6 space-y-3">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_260px]">
+      <div className="mb-5 space-y-3 sm:mb-6">
+        <div className="grid grid-cols-[minmax(0,1fr)_3rem] gap-2 sm:grid-cols-[minmax(0,1fr)_240px] sm:gap-3 lg:grid-cols-[minmax(0,1fr)_260px]">
           <label className="relative block">
             <span className="sr-only">試合を検索</span>
             <Search
@@ -137,24 +148,27 @@ export function MarketBrowser({ markets }: { markets: MarketWithMatch[] }) {
             ariaLabel="並び替え"
             options={SORTS.map((s) => ({ value: s.key, label: s.label }))}
             icon={<SlidersHorizontal size={18} className="shrink-0 text-ash-gray" />}
+            mobileIconOnly
           />
         </div>
 
-        <div className="-mx-5 overflow-x-auto px-5 md:mx-0 md:px-0">
-          <div className="flex min-w-max gap-2">
+        <div>
+          <div className="grid grid-cols-4 gap-1.5 sm:flex sm:gap-2">
             {TABS.map((t) => (
               <button
                 key={t.key}
                 onClick={() => setActive(t.key)}
                 aria-pressed={active === t.key}
-                className={`rounded-[100px] border px-4 py-2 text-sm transition-colors ${
+                className={`min-h-11 min-w-0 whitespace-nowrap rounded-[100px] border px-2 py-2 text-xs transition-colors sm:px-4 sm:text-sm ${
                   active === t.key
                     ? "bg-cream-glow text-void-black border-transparent"
                     : "border-olive-stone text-ash-gray hover:text-cream-glow hover:border-cream-glow"
                 }`}
               >
                 {t.label}
-                <span className="ml-2 tabular-nums opacity-70">{counts[t.key]}</span>
+                <span className="ml-1 hidden tabular-nums opacity-70 min-[360px]:inline sm:ml-2">
+                  {counts[t.key]}
+                </span>
               </button>
             ))}
           </div>
@@ -163,16 +177,45 @@ export function MarketBrowser({ markets }: { markets: MarketWithMatch[] }) {
 
       {filtered.length > 0 ? (
         <div className="mb-3 text-sm text-ash-gray">
+          {Math.min(visible, filtered.length).toLocaleString("ja-JP")} /{" "}
           {filtered.length.toLocaleString("ja-JP")}件表示
         </div>
       ) : null}
 
       {filtered.length > 0 ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 lg:gap-5">
-          {filtered.map((market) => (
-            <MarketCard key={market.id} market={market} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 lg:gap-5">
+            {filtered.slice(0, visible).map((market) => (
+              <MarketCard key={market.id} market={market} />
+            ))}
+          </div>
+
+          {filtered.length > PAGE_SIZE && (
+            <div className="mt-6 flex items-center justify-center">
+              {visible < filtered.length ? (
+                <button
+                  type="button"
+                  onClick={() => setVisible((v) => Math.min(v + PAGE_SIZE, filtered.length))}
+                  className="inline-flex items-center gap-1.5 rounded-[100px] border border-olive-stone px-5 py-2.5 text-sm text-ash-gray transition-colors hover:border-cream-glow hover:text-cream-glow"
+                >
+                  もっと見る
+                  <ChevronDown size={16} />
+                  <span className="tabular-nums opacity-70">
+                    残り{(filtered.length - visible).toLocaleString("ja-JP")}件
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setVisible(PAGE_SIZE)}
+                  className="rounded-[100px] border border-olive-stone px-5 py-2.5 text-sm text-ash-gray transition-colors hover:border-cream-glow hover:text-cream-glow"
+                >
+                  閉じる
+                </button>
+              )}
+            </div>
+          )}
+        </>
       ) : (
         <div className="card p-10 text-center text-ash-gray">
           該当するマーケットはありません。
