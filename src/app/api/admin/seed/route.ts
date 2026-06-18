@@ -6,7 +6,7 @@ import { initialQYes } from "@/lib/lmsr";
 /** POST /api/admin/seed — demo World Cup matches + markets (idempotent by external_id). */
 export async function POST(req: NextRequest) {
   if (!requireAdminSecret(req)) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    return NextResponse.json({ error: "管理者権限が必要です。" }, { status: 403 });
   }
   const admin = createAdminClient();
   const B = 150;

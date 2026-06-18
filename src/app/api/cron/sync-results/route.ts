@@ -10,6 +10,7 @@ import {
 } from "@/lib/oddsApi";
 import { clampPrice, initialQYes } from "@/lib/lmsr";
 import { jaTeam } from "@/lib/teamNames";
+import { toJapaneseError } from "@/lib/errors";
 
 /**
  * POST /api/cron/sync-results — World Cup only.
@@ -20,7 +21,7 @@ import { jaTeam } from "@/lib/teamNames";
  */
 export async function POST(req: NextRequest) {
   if (!requireAdminSecret(req)) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    return NextResponse.json({ error: "管理者権限が必要です。" }, { status: 403 });
   }
   const admin = createAdminClient();
   const B = 150;
@@ -29,11 +30,21 @@ export async function POST(req: NextRequest) {
   let flagged = 0;
 
   // ---- 1. full schedule + odds ----
-  const [events, oddsEvents, scores] = await Promise.all([
-    fetchWorldCupEvents(),
-    fetchWorldCupOdds(),
-    fetchWorldCupScores(3),
-  ]);
+  let events: Awaited<ReturnType<typeof fetchWorldCupEvents>>;
+  let oddsEvents: Awaited<ReturnType<typeof fetchWorldCupOdds>>;
+  let scores: Awaited<ReturnType<typeof fetchWorldCupScores>>;
+  try {
+    [events, oddsEvents, scores] = await Promise.all([
+      fetchWorldCupEvents(),
+      fetchWorldCupOdds(),
+      fetchWorldCupScores(3),
+    ]);
+  } catch (error) {
+    return NextResponse.json(
+      { error: toJapaneseError(error, "試合データの同期に失敗しました。") },
+      { status: 502 }
+    );
+  }
 
   // de-vigged home-win probability per event id (only where odds are posted)
   const probById = new Map<string, number>();

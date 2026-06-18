@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { toJapaneseError } from "@/lib/errors";
 
 /** POST /api/markets/:id/buy  body: { side: "YES"|"NO", pointsSpent: number } */
 export async function POST(
@@ -25,7 +26,7 @@ export async function POST(
 
   const { side, pointsSpent } = body;
   if (side !== "YES" && side !== "NO") {
-    return NextResponse.json({ error: "side は YES または NO です" }, { status: 400 });
+    return NextResponse.json({ error: "YES または NO を選択してください。" }, { status: 400 });
   }
   if (typeof pointsSpent !== "number" || pointsSpent <= 0) {
     return NextResponse.json({ error: "ポイントは正の数で指定してください" }, { status: 400 });
@@ -38,7 +39,7 @@ export async function POST(
   });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ error: toJapaneseError(error, "購入に失敗しました。") }, { status: 400 });
   }
   return NextResponse.json(data);
 }

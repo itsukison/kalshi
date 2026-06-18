@@ -28,7 +28,7 @@ export interface ScoreEvent {
 
 function key(): string {
   const k = process.env.ODDS_API_KEY;
-  if (!k) throw new Error("ODDS_API_KEY is not set");
+  if (!k) throw new Error("ODDS_API_KEY が設定されていません。");
   return k;
 }
 
@@ -43,21 +43,21 @@ export interface ScheduleEvent {
 export async function fetchWorldCupEvents(): Promise<ScheduleEvent[]> {
   const url = `${BASE}/sports/${WORLD_CUP_SPORT_KEY}/events?apiKey=${key()}`;
   const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Odds API events error: ${res.status} ${await res.text()}`);
+  if (!res.ok) throw new Error(`試合日程APIの取得に失敗しました。ステータス: ${res.status} ${await res.text()}`);
   return res.json();
 }
 
 export async function fetchWorldCupOdds(): Promise<OddsEvent[]> {
   const url = `${BASE}/sports/${WORLD_CUP_SPORT_KEY}/odds?regions=eu&markets=h2h&oddsFormat=decimal&apiKey=${key()}`;
   const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Odds API odds error: ${res.status} ${await res.text()}`);
+  if (!res.ok) throw new Error(`オッズAPIの取得に失敗しました。ステータス: ${res.status} ${await res.text()}`);
   return res.json();
 }
 
 export async function fetchWorldCupScores(daysFrom = 3): Promise<ScoreEvent[]> {
   const url = `${BASE}/sports/${WORLD_CUP_SPORT_KEY}/scores?daysFrom=${daysFrom}&apiKey=${key()}`;
   const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Odds API scores error: ${res.status} ${await res.text()}`);
+  if (!res.ok) throw new Error(`スコアAPIの取得に失敗しました。ステータス: ${res.status} ${await res.text()}`);
   return res.json();
 }
 
