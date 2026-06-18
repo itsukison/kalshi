@@ -19,6 +19,7 @@ import { AccountActions } from "@/components/AccountActions";
 import { ShareButton } from "@/components/ShareButton";
 import { computeBadges, type BadgeIcon } from "@/lib/achievements";
 import { formatJstDateTime, formatPoints, formatPercent } from "@/lib/format";
+import { effectiveStatus } from "@/lib/marketStatus";
 
 const BADGE_ICONS: Record<BadgeIcon, LucideIcon> = {
   target: Target,
@@ -58,7 +59,7 @@ export default async function AccountPage() {
   ] = await Promise.all([
       supabase
         .from("positions")
-        .select("side, contracts, total_cost, created_at, markets(id, question, status, resolved_outcome)")
+        .select("side, contracts, total_cost, created_at, markets(id, question, status, closes_at, resolved_outcome)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false }),
       supabase
@@ -90,18 +91,16 @@ export default async function AccountPage() {
   const biggestWin = wins && wins.length > 0 ? Number(wins[0].amount) : 0;
   const rank = (richerCount ?? 0) + 1;
   const positionRows = positions ?? [];
+  const effStatus = (p: (typeof positionRows)[number]) => {
+    const m = p.markets as unknown as { status: string; closes_at: string } | null;
+    return m ? effectiveStatus(m) : null;
+  };
   const activeCount = positionRows.filter((p) => {
-    const m = p.markets as unknown as { status: string } | null;
-    return m && (m.status === "open" || m.status === "closed");
+    const s = effStatus(p);
+    return s === "open" || s === "closed";
   }).length;
-  const resolvedCount = positionRows.filter((p) => {
-    const m = p.markets as unknown as { status: string } | null;
-    return m?.status === "resolved";
-  }).length;
-  const waitingCount = positionRows.filter((p) => {
-    const m = p.markets as unknown as { status: string } | null;
-    return m?.status === "closed";
-  }).length;
+  const resolvedCount = positionRows.filter((p) => effStatus(p) === "resolved").length;
+  const waitingCount = positionRows.filter((p) => effStatus(p) === "closed").length;
 
   const jstToday = new Date(
     new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" })
@@ -250,10 +249,12 @@ export default async function AccountPage() {
             id: string;
             question: string;
             status: string;
+            closes_at: string;
             resolved_outcome: string | null;
           } | null;
-          const won = market?.status === "resolved" && market.resolved_outcome === p.side;
-          const pending = market?.status === "closed";
+          const eff = market ? effectiveStatus(market) : null;
+          const won = eff === "resolved" && market!.resolved_outcome === p.side;
+          const pending = eff === "closed";
           return (
             <Link
               key={i}
@@ -269,7 +270,7 @@ export default async function AccountPage() {
               </span>
               <span
                 className={`text-xs ${
-                  market?.status === "resolved"
+                  eff === "resolved"
                     ? won
                       ? "text-pulse-green"
                       : "text-ash-gray"
@@ -278,7 +279,7 @@ export default async function AccountPage() {
                       : "text-ash-gray"
                 }`}
               >
-                {market?.status === "resolved"
+                {eff === "resolved"
                   ? won
                     ? "的中"
                     : "不的中"

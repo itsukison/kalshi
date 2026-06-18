@@ -2,29 +2,17 @@ import Link from "next/link";
 import { CalendarDays, TrendingUp } from "lucide-react";
 import type { Market, Match } from "@/lib/database.types";
 import { formatJstDateTime, relativeDayLabel } from "@/lib/format";
+import { effectiveStatus, isTradable, STATUS_LABEL, STATUS_COLOR } from "@/lib/marketStatus";
 
 export type MarketWithMatch = Market & { matches: Match | null };
-
-const STATUS_LABEL: Record<string, string> = {
-  open: "取引中",
-  closed: "結果待ち",
-  resolved: "確定",
-  cancelled: "中止",
-};
-
-const STATUS_COLOR: Record<string, string> = {
-  open: "text-pulse-green",
-  closed: "text-ember-orange",
-  resolved: "text-ash-gray",
-  cancelled: "text-ash-gray",
-};
 
 export function MarketCard({ market }: { market: MarketWithMatch }) {
   const yes = Math.round(Number(market.yes_price));
   const no = 100 - yes;
   const m = market.matches;
   const rel = relativeDayLabel(market.closes_at);
-  const tradable = market.status === "open" && new Date(market.closes_at) > new Date();
+  const status = effectiveStatus(market);
+  const tradable = isTradable(market);
   const movement = yes - Math.round(Number(market.initial_yes_price));
   const score =
     m?.home_score != null && m?.away_score != null
@@ -34,12 +22,12 @@ export function MarketCard({ market }: { market: MarketWithMatch }) {
   return (
     <Link
       href={`/market/${market.id}`}
-      className="card block p-5 transition-colors hover:border-cream-glow md:p-6"
+      className="card flex h-full flex-col p-5 transition-colors hover:border-cream-glow md:p-6"
     >
       <div className="mb-3 flex items-center justify-between gap-3 text-xs">
         <span className="bracket min-w-0 truncate text-ash-gray">{m?.league ?? "サッカー"}</span>
-        <span className={`shrink-0 ${STATUS_COLOR[market.status] ?? "text-ash-gray"}`}>
-          {STATUS_LABEL[market.status] ?? market.status}
+        <span className={`shrink-0 ${STATUS_COLOR[status] ?? "text-ash-gray"}`}>
+          {STATUS_LABEL[status] ?? market.status}
         </span>
       </div>
 
@@ -55,7 +43,9 @@ export function MarketCard({ market }: { market: MarketWithMatch }) {
           )}
         </p>
       )}
-      <h3 className="mb-3 text-base leading-snug md:text-lg">{market.question}</h3>
+      <h3 className="mb-3 line-clamp-2 min-h-[2.75rem] text-base leading-snug md:min-h-[3.25rem] md:text-lg">
+        {market.question}
+      </h3>
 
       {/* date / closing line */}
       <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ash-gray">
@@ -89,24 +79,18 @@ export function MarketCard({ market }: { market: MarketWithMatch }) {
         </div>
       )}
 
-      <div className="flex items-center gap-2">
-        <div className="flex-1">
-          <div className="flex justify-between text-sm mb-1">
-            <span className="text-pulse-green">YES</span>
-            <span className="font-display tabular-nums text-pulse-green">{yes}</span>
-          </div>
-          <div className="h-1.5 rounded-full bg-olive-stone overflow-hidden">
-            <div className="h-full bg-pulse-green" style={{ width: `${yes}%` }} />
-          </div>
+      <div className="mt-auto">
+        <div className="mb-1.5 flex items-center justify-between text-sm">
+          <span className="text-pulse-green">
+            YES <span className="font-display tabular-nums">{yes}</span>
+          </span>
+          <span className="text-candy-pink">
+            <span className="font-display tabular-nums">{no}</span> NO
+          </span>
         </div>
-        <div className="flex-1">
-          <div className="flex justify-between text-sm mb-1">
-            <span className="text-candy-pink">NO</span>
-            <span className="font-display tabular-nums text-candy-pink">{no}</span>
-          </div>
-          <div className="h-1.5 rounded-full bg-olive-stone overflow-hidden">
-            <div className="h-full bg-candy-pink" style={{ width: `${no}%` }} />
-          </div>
+        <div className="flex h-2 overflow-hidden rounded-full bg-olive-stone">
+          <div className="bg-pulse-green" style={{ width: `${yes}%` }} />
+          <div className="bg-candy-pink" style={{ width: `${no}%` }} />
         </div>
       </div>
     </Link>

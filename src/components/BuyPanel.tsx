@@ -6,6 +6,7 @@ import Link from "next/link";
 import { CheckCircle2, ExternalLink } from "lucide-react";
 import { estimateContracts } from "@/lib/lmsr";
 import { ShareButton } from "@/components/ShareButton";
+import { isTradable } from "@/lib/marketStatus";
 import { toJapaneseError } from "@/lib/errors";
 
 type PurchaseSummary = {
@@ -45,7 +46,7 @@ export function BuyPanel({
   const [error, setError] = useState<string | null>(null);
   const [purchase, setPurchase] = useState<PurchaseSummary | null>(null);
 
-  const tradable = status === "open" && new Date(closesAt) > new Date();
+  const tradable = isTradable({ status, closes_at: closesAt });
   const currentBalance = purchase?.newBalance ?? balance;
   const est =
     points > 0 ? estimateContracts(side, points, qYes, qNo, b) : null;
@@ -139,20 +140,22 @@ export function BuyPanel({
       <div className="grid grid-cols-2 gap-3 mb-5">
         <button
           onClick={() => setSide("YES")}
-          className={`pill border rounded-[100px] py-3 transition-colors ${
+          aria-pressed={side === "YES"}
+          className={`rounded-[100px] border py-3 transition-colors ${
             side === "YES"
-              ? "bg-pulse-green text-void-black border-transparent"
-              : "border-olive-stone text-pulse-green hover:border-pulse-green"
+              ? "border-pulse-green font-semibold text-pulse-green"
+              : "border-olive-stone text-ash-gray hover:border-pulse-green hover:text-pulse-green"
           }`}
         >
           YES で予測
         </button>
         <button
           onClick={() => setSide("NO")}
+          aria-pressed={side === "NO"}
           className={`rounded-[100px] border py-3 transition-colors ${
             side === "NO"
-              ? "bg-candy-pink text-void-black border-transparent"
-              : "border-olive-stone text-candy-pink hover:border-candy-pink"
+              ? "border-candy-pink font-semibold text-candy-pink"
+              : "border-olive-stone text-ash-gray hover:border-candy-pink hover:text-candy-pink"
           }`}
         >
           NO で予測
@@ -175,7 +178,7 @@ export function BuyPanel({
             type="button"
             onClick={() => setPoints(Math.min(v, Math.floor(currentBalance)))}
             disabled={currentBalance < 1}
-            className="rounded-[100px] border border-olive-stone px-3 py-1 text-xs text-ash-gray hover:text-cream-glow disabled:opacity-40"
+            className="rounded-[100px] border border-olive-stone px-4 py-2 text-sm text-ash-gray hover:border-cream-glow hover:text-cream-glow disabled:opacity-40"
           >
             {v}
           </button>

@@ -66,7 +66,7 @@ export function LeaderboardTable({ rows }: { rows: LeaderRow[] }) {
             onClick={() => setSort(s.key)}
             className={`rounded-[100px] border px-4 py-2 text-sm transition-colors ${
               sort === s.key
-                ? "bg-pulse-green text-void-black border-transparent"
+                ? "border-pulse-green font-semibold text-pulse-green"
                 : "border-olive-stone text-ash-gray hover:text-cream-glow hover:border-cream-glow"
             }`}
           >

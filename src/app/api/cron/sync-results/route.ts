@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminSecret } from "@/lib/auth";
+import { requireCronAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   fetchWorldCupEvents,
@@ -12,15 +12,21 @@ import { clampPrice, initialQYes } from "@/lib/lmsr";
 import { jaTeam } from "@/lib/teamNames";
 import { toJapaneseError } from "@/lib/errors";
 
+// This route fans out to The Odds API (3 endpoints) plus many DB writes, which can
+// exceed the default serverless timeout. Vercel Hobby allows up to 60s.
+export const maxDuration = 60;
+
 /**
  * POST /api/cron/sync-results — World Cup only.
  * 1) Pull the full schedule (/events) + odds, upsert every match, and auto-create a
  *    "home win" market (price from de-vigged odds when available, else 50).
- * 2) Pull scores; finish matches; flag markets ready_for_review with a suggested outcome.
- * Does NOT auto-settle — an admin confirms via /api/admin/markets/:id/resolve.
+ * 2) Pull scores; finish matches; auto-settle the home-win market when the API
+ *    reports a completed match with both scores (home win in regulation => YES).
+ *    Markets that can't be auto-resolved fall back to ready_for_review for an
+ *    admin to confirm via /api/admin/markets/:id/resolve.
  */
-export async function POST(req: NextRequest) {
-  if (!requireAdminSecret(req)) {
+async function handle(req: NextRequest) {
+  if (!requireCronAuth(req)) {
     return NextResponse.json({ error: "管理者権限が必要です。" }, { status: 403 });
   }
   const admin = createAdminClient();
@@ -28,6 +34,7 @@ export async function POST(req: NextRequest) {
   let upserted = 0;
   let marketsCreated = 0;
   let flagged = 0;
+  let resolved = 0;
 
   // ---- 1. full schedule + odds ----
   let events: Awaited<ReturnType<typeof fetchWorldCupEvents>>;
@@ -130,17 +137,53 @@ export async function POST(req: NextRequest) {
       .single();
     if (!match) continue;
 
-    // suggest outcome for the home-win market (home win in regulation => YES)
-    const suggested =
-      homeScore != null && awayScore != null && homeScore > awayScore ? "YES" : "NO";
-    const { data: flaggedRows } = await admin
+    // Need both scores to settle confidently; otherwise just flag for review.
+    const haveScores = homeScore != null && awayScore != null;
+    const outcome = haveScores && homeScore! > awayScore! ? "YES" : "NO";
+
+    // The home-win market(s) for this match that aren't already settled.
+    const { data: openMarkets } = await admin
       .from("markets")
-      .update({ ready_for_review: true, settlement_source: `suggested:${suggested}` })
+      .select("id, status")
       .eq("match_id", match.id)
-      .in("status", ["open", "closed"])
-      .select("id");
-    flagged += flaggedRows?.length ?? 0;
+      .in("status", ["open", "closed"]);
+
+    for (const mk of openMarkets ?? []) {
+      if (!haveScores) {
+        await admin
+          .from("markets")
+          .update({ ready_for_review: true, settlement_source: `suggested:${outcome}` })
+          .eq("id", mk.id);
+        flagged++;
+        continue;
+      }
+
+      // resolve_market requires status='closed'; close it first if still open.
+      if (mk.status === "open") {
+        await admin.from("markets").update({ status: "closed" }).eq("id", mk.id);
+      }
+
+      const { error: resolveErr } = await admin.rpc("resolve_market", {
+        p_market_id: mk.id,
+        p_outcome: outcome,
+        p_settlement_source: "auto:the-odds-api",
+      });
+      if (resolveErr) {
+        // Fall back to manual review if the auto-resolve fails for any reason.
+        await admin
+          .from("markets")
+          .update({ ready_for_review: true, settlement_source: `suggested:${outcome}` })
+          .eq("id", mk.id);
+        flagged++;
+      } else {
+        resolved++;
+      }
+    }
   }
 
-  return NextResponse.json({ upserted, marketsCreated, flagged });
+  return NextResponse.json({ upserted, marketsCreated, flagged, resolved });
 }
+
+// Vercel Cron invokes via GET; manual/curl calls may use POST.
+export const GET = handle;
+export const POST = handle;

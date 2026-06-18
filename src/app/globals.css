@@ -31,7 +31,13 @@ body {
 
 body {
   font-family: var(--font-noto-jp), var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
-  letter-spacing: 0;
+  letter-spacing: -0.011em;
+}
+
+/* Keyboard-only focus ring — standardized across all interactive elements. */
+:focus-visible {
+  outline: 2px solid var(--color-cream-glow);
+  outline-offset: 2px;
 }
 
 .btn-ghost {
@@ -64,11 +70,11 @@ body {
 
 .bracket::before {
   content: "{ ";
-  color: var(--color-ash-gray);
+  color: var(--color-cream-glow);
 }
 .bracket::after {
   content: " }";
-  color: var(--color-ash-gray);
+  color: var(--color-cream-glow);
 }
 
 .hairline {

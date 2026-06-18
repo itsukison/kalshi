@@ -72,6 +72,7 @@ Create `.env.local` in the project root:
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon (publishable) key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key — admin routes, cron, and trading |
 | `ADMIN_SECRET` | Shared secret for `/api/admin/*` and `/api/cron/*` (sent as `x-admin-secret` header) |
+| `CRON_SECRET` | Vercel Cron secret — Vercel sends it as `Authorization: Bearer <CRON_SECRET>` to the cron routes |
 | `ODDS_API_KEY` | The Odds API key — required for live World Cup sync (optional if using seed data) |
 
 For local auth testing, disable **Confirm email** in Supabase Dashboard → Authentication → Providers → Email. Re-enable before production.
