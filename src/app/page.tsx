@@ -17,7 +17,7 @@ export default async function HomePage() {
         <p className="bracket text-sm text-ash-gray mb-3">FIFA World Cup</p>
         <h1 className="font-display font-semibold text-5xl md:text-6xl leading-[0.95] tracking-tight max-w-3xl">
           試合を<span className="text-pulse-green">予測</span>して、
-          <br />
+          <br className="hidden sm:block" />
           ポイントを稼ごう。
         </h1>
         <p className="mt-5 text-ash-gray max-w-xl">

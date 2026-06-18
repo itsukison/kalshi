@@ -5,15 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { BuyPanel } from "@/components/BuyPanel";
 import { ShareButton } from "@/components/ShareButton";
 import { formatJstDateTime, formatPoints } from "@/lib/format";
+import { statusLabel } from "@/lib/marketStatus";
 
 export const dynamic = "force-dynamic";
-
-const STATUS_LABEL: Record<string, string> = {
-  open: "取引中",
-  closed: "結果待ち",
-  resolved: "確定",
-  cancelled: "中止",
-};
 
 export default async function MarketPage({
   params,
@@ -77,7 +71,7 @@ export default async function MarketPage({
 
       <div className="mt-5 flex items-center justify-between text-xs text-ash-gray">
         <span className="bracket">{m?.league ?? "サッカー"}</span>
-        <span>{STATUS_LABEL[market.status] ?? market.status}</span>
+        <span>{statusLabel(market)}</span>
       </div>
 
       {m && (

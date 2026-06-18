@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { MarketCard, type MarketWithMatch } from "@/components/MarketCard";
+import { Dropdown } from "@/components/Dropdown";
+import { effectiveStatus } from "@/lib/marketStatus";
 
 type FilterKey = "all" | "open" | "closed" | "done";
 type SortKey = "kickoff" | "closing" | "popular" | "underdog" | "movement";
@@ -23,8 +25,9 @@ const SORTS: { key: SortKey; label: string }[] = [
 ];
 
 function bucket(m: MarketWithMatch): FilterKey {
-  if (m.status === "open" && new Date(m.closes_at) > new Date()) return "open";
-  if (m.status === "resolved" || m.status === "cancelled") return "done";
+  const s = effectiveStatus(m);
+  if (s === "open") return "open";
+  if (s === "resolved" || s === "cancelled") return "done";
   return "closed"; // closed, or open-but-past-close awaiting result
 }
 
@@ -63,14 +66,23 @@ function sortMarkets(markets: MarketWithMatch[], sort: SortKey): MarketWithMatch
         );
       case "closing":
         return new Date(a.closes_at).getTime() - new Date(b.closes_at).getTime();
-      default:
-        return kickoffTime(a) - kickoffTime(b);
+      default: {
+        // 試合が近い順: upcoming games first (soonest kickoff first), then past
+        // games after, most-recent first — so approaching matches lead the list.
+        const now = Date.now();
+        const aUpcoming = kickoffTime(a) >= now;
+        const bUpcoming = kickoffTime(b) >= now;
+        if (aUpcoming !== bUpcoming) return aUpcoming ? -1 : 1;
+        return aUpcoming
+          ? kickoffTime(a) - kickoffTime(b)
+          : kickoffTime(b) - kickoffTime(a);
+      }
     }
   });
 }
 
 export function MarketBrowser({ markets }: { markets: MarketWithMatch[] }) {
-  const [active, setActive] = useState<FilterKey>("all");
+  const [active, setActive] = useState<FilterKey>("open");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("kickoff");
 
@@ -119,27 +131,13 @@ export function MarketBrowser({ markets }: { markets: MarketWithMatch[] }) {
             )}
           </label>
 
-          <label className="relative block">
-            <span className="sr-only">並び替え</span>
-            <SlidersHorizontal
-              size={18}
-              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ash-gray"
-            />
-            <select
-              value={sort}
-              onChange={(event) => setSort(event.target.value as SortKey)}
-              className="h-12 w-full appearance-none rounded-[8px] border border-olive-stone bg-void-black px-11 text-sm text-cream-glow outline-none transition-colors focus:border-cream-glow"
-            >
-              {SORTS.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-            <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-ash-gray">
-              ▼
-            </span>
-          </label>
+          <Dropdown
+            value={sort}
+            onChange={(value) => setSort(value)}
+            ariaLabel="並び替え"
+            options={SORTS.map((s) => ({ value: s.key, label: s.label }))}
+            icon={<SlidersHorizontal size={18} className="shrink-0 text-ash-gray" />}
+          />
         </div>
 
         <div className="-mx-5 overflow-x-auto px-5 md:mx-0 md:px-0">

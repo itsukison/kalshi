@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminSecret } from "@/lib/auth";
+import { requireCronAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { toJapaneseError } from "@/lib/errors";
 
-/** POST /api/cron/close-markets — flip open markets past closes_at to 'closed'. */
-export async function POST(req: NextRequest) {
-  if (!requireAdminSecret(req)) {
+/** Flip open markets past closes_at to 'closed'. */
+async function handle(req: NextRequest) {
+  if (!requireCronAuth(req)) {
     return NextResponse.json({ error: "管理者権限が必要です。" }, { status: 403 });
   }
   const admin = createAdminClient();
@@ -21,3 +21,7 @@ export async function POST(req: NextRequest) {
   }
   return NextResponse.json({ closed: data?.length ?? 0, ids: data?.map((m) => m.id) });
 }
+
+// Vercel Cron invokes via GET; manual/curl calls may use POST.
+export const GET = handle;
+export const POST = handle;
