@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { AccountActions } from "@/components/AccountActions";
+import { ProfitShareSheet, type ProfitShareData } from "@/components/ProfitShareSheet";
 import { ShareButton } from "@/components/ShareButton";
 import { computeBadges, type BadgeIcon } from "@/lib/achievements";
 import { formatJstDateTime, formatPoints, formatPercent } from "@/lib/format";
@@ -58,7 +59,9 @@ export default async function AccountPage() {
   ] = await Promise.all([
       supabase
         .from("positions")
-        .select("side, contracts, total_cost, created_at, markets(id, question, status, resolved_outcome)")
+        .select(
+          "side, contracts, total_cost, created_at, markets(id, question, status, resolved_outcome, matches(home_team, away_team, league, home_score, away_score))"
+        )
         .eq("user_id", user.id)
         .order("created_at", { ascending: false }),
       supabase
@@ -251,42 +254,79 @@ export default async function AccountPage() {
             question: string;
             status: string;
             resolved_outcome: string | null;
+            matches: {
+              home_team: string;
+              away_team: string;
+              league: string | null;
+              home_score: number | null;
+              away_score: number | null;
+            } | null;
           } | null;
           const won = market?.status === "resolved" && market.resolved_outcome === p.side;
           const pending = market?.status === "closed";
+          const stake = Number(p.total_cost);
+          const payout = won ? Math.round(Number(p.contracts) * 100) : 0;
+          const profitShareData: ProfitShareData | null =
+            market?.status === "resolved" && market.resolved_outcome
+              ? {
+                  homeTeam: market.matches?.home_team ?? "ホーム",
+                  awayTeam: market.matches?.away_team ?? "アウェイ",
+                  league: market.matches?.league,
+                  question: market.question,
+                  userSide: p.side,
+                  resolvedOutcome: market.resolved_outcome as "YES" | "NO",
+                  homeScore: market.matches?.home_score,
+                  awayScore: market.matches?.away_score,
+                  stake,
+                  payout,
+                  profit: payout - stake,
+                  contracts: Number(p.contracts),
+                }
+              : null;
           return (
-            <Link
+            <div
               key={i}
-              href={market ? `/market/${market.id}` : "#"}
-              className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 px-5 py-4 hover:bg-olive-stone/20 md:grid-cols-[auto_1fr_auto_auto] md:items-center md:px-6"
+              className="grid gap-3 px-5 py-4 hover:bg-olive-stone/20 md:grid-cols-[1fr_auto] md:items-center md:px-6"
             >
-              <span className={p.side === "YES" ? "text-pulse-green" : "text-candy-pink"}>
-                {p.side}
-              </span>
-              <span className="min-w-0 truncate text-sm">{market?.question ?? "—"}</span>
-              <span className="text-xs text-ash-gray tabular-nums md:text-right">
-                {Number(p.contracts).toFixed(2)} 枚
-              </span>
-              <span
-                className={`text-xs ${
-                  market?.status === "resolved"
-                    ? won
-                      ? "text-pulse-green"
-                      : "text-ash-gray"
-                    : pending
-                      ? "text-ember-orange"
-                      : "text-ash-gray"
-                }`}
+              <Link
+                href={market ? `/market/${market.id}` : "#"}
+                className="grid min-w-0 grid-cols-[auto_1fr] gap-x-3 gap-y-2 md:grid-cols-[auto_1fr_auto_auto] md:items-center"
               >
-                {market?.status === "resolved"
-                  ? won
-                    ? "的中"
-                    : "不的中"
-                  : pending
-                    ? "結果待ち"
-                    : "保有中"}
-              </span>
-            </Link>
+                <span className={p.side === "YES" ? "text-pulse-green" : "text-candy-pink"}>
+                  {p.side}
+                </span>
+                <span className="min-w-0 truncate text-sm">{market?.question ?? "—"}</span>
+                <span className="text-xs text-ash-gray tabular-nums md:text-right">
+                  {Number(p.contracts).toFixed(2)} 枚
+                </span>
+                <span
+                  className={`text-xs ${
+                    market?.status === "resolved"
+                      ? won
+                        ? "text-pulse-green"
+                        : "text-ash-gray"
+                      : pending
+                        ? "text-ember-orange"
+                        : "text-ash-gray"
+                  }`}
+                >
+                  {market?.status === "resolved"
+                    ? won
+                      ? "的中"
+                      : "不的中"
+                    : pending
+                      ? "結果待ち"
+                      : "保有中"}
+                </span>
+              </Link>
+              {profitShareData && (
+                <ProfitShareSheet
+                  data={profitShareData}
+                  buttonLabel="利益をシェア"
+                  className="w-full px-3 py-2 md:w-auto"
+                />
+              )}
+            </div>
           );
         })}
         {positionRows.length === 0 && (

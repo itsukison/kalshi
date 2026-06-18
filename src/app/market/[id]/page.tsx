@@ -3,6 +3,7 @@ import { ArrowLeft, ExternalLink, PlayCircle, Trophy } from "lucide-react";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { BuyPanel } from "@/components/BuyPanel";
+import { ProfitShareSheet, type ProfitShareData } from "@/components/ProfitShareSheet";
 import { ShareButton } from "@/components/ShareButton";
 import { formatJstDateTime, formatPoints } from "@/lib/format";
 
@@ -61,6 +62,26 @@ export default async function MarketPage({
   const userHasPosition = positions.length > 0;
   const userWon = winningContracts > 0;
   const payout = Math.round(winningContracts * 100);
+  const stake = positions.reduce((sum, p) => sum + Number(p.total_cost), 0);
+  const userSide =
+    positions.length === 1 ? positions[0].side : positions.map((p) => p.side).join(" / ");
+  const profitShareData: ProfitShareData | null =
+    market.status === "resolved" && resolvedOutcome && userHasPosition
+      ? {
+          homeTeam: m?.home_team ?? "ホーム",
+          awayTeam: m?.away_team ?? "アウェイ",
+          league: m?.league,
+          question: market.question,
+          userSide,
+          resolvedOutcome,
+          homeScore: m?.home_score,
+          awayScore: m?.away_score,
+          stake,
+          payout,
+          profit: payout - stake,
+          contracts: positions.reduce((sum, p) => sum + Number(p.contracts), 0),
+        }
+      : null;
   const matchLabel = m ? `${m.home_team} vs ${m.away_team}` : undefined;
   const highlightQuery = encodeURIComponent(
     `${matchLabel ?? market.question} ハイライト`
@@ -151,6 +172,27 @@ export default async function MarketPage({
                   </span>{" "}
                   pt
                 </p>
+                <p
+                  className={`mt-1 tabular-nums ${
+                    payout - stake > 0
+                      ? "text-pulse-green"
+                      : payout - stake < 0
+                        ? "text-candy-pink"
+                        : "text-ash-gray"
+                  }`}
+                >
+                  損益 {payout - stake > 0 ? "+" : ""}
+                  {formatPoints(payout - stake)} pt
+                </p>
+                {profitShareData && (
+                  <div className="mt-3">
+                    <ProfitShareSheet
+                      data={profitShareData}
+                      buttonLabel="利益をシェア"
+                      className="px-3 py-2"
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
