@@ -3,10 +3,22 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { CheckCircle2, ExternalLink } from "lucide-react";
 import { estimateContracts } from "@/lib/lmsr";
+import { ShareButton } from "@/components/ShareButton";
+import { toJapaneseError } from "@/lib/errors";
+
+type PurchaseSummary = {
+  side: "YES" | "NO";
+  pointsSpent: number;
+  contracts: number;
+  newBalance: number;
+};
 
 export function BuyPanel({
   marketId,
+  marketQuestion,
+  matchLabel,
   qYes,
   qNo,
   b,
@@ -16,6 +28,8 @@ export function BuyPanel({
   balance,
 }: {
   marketId: string;
+  marketQuestion: string;
+  matchLabel?: string;
   qYes: number;
   qNo: number;
   b: number;
@@ -29,11 +43,13 @@ export function BuyPanel({
   const [points, setPoints] = useState(100);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
+  const [purchase, setPurchase] = useState<PurchaseSummary | null>(null);
 
   const tradable = status === "open" && new Date(closesAt) > new Date();
+  const currentBalance = purchase?.newBalance ?? balance;
   const est =
     points > 0 ? estimateContracts(side, points, qYes, qNo, b) : null;
+  const projectedPayout = est ? Math.round(est.contracts * 100) : 0;
 
   if (!tradable) {
     return (
@@ -55,9 +71,13 @@ export function BuyPanel({
   }
 
   async function submit() {
+    if (points > currentBalance) {
+      setError("ポイント残高が不足しています。");
+      return;
+    }
     setLoading(true);
     setError(null);
-    setDone(null);
+    setPurchase(null);
     try {
       const res = await fetch(`/api/markets/${marketId}/buy`, {
         method: "POST",
@@ -66,21 +86,56 @@ export function BuyPanel({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "購入に失敗しました");
-      setDone(
-        `${Number(data.position.contracts).toFixed(2)} 枚を購入しました（残高 ${Math.round(
-          data.new_balance
-        ).toLocaleString()} pt）`
+      const contracts = Number(
+        data.trade?.contracts_bought ?? data.position?.contracts ?? est?.contracts ?? 0
       );
+      const newBalance = Number(data.new_balance ?? currentBalance - points);
+      setPurchase({ side, pointsSpent: points, contracts, newBalance });
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "エラーが発生しました");
+      setError(toJapaneseError(e, "購入に失敗しました。"));
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="card p-6">
+    <div className="card p-5 md:p-6">
+      {purchase && (
+        <div className="mb-5 rounded-[8px] border border-pulse-green/70 p-4">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="mt-0.5 shrink-0 text-pulse-green" size={21} />
+            <div className="min-w-0">
+              <p className="text-sm text-pulse-green">予測を受け付けました</p>
+              <p className="mt-1 text-sm leading-relaxed text-cream-glow">
+                {purchase.side} に {purchase.pointsSpent.toLocaleString("ja-JP")} pt 投入。
+                約 {purchase.contracts.toFixed(2)} 枚を保有中です。
+              </p>
+              <p className="mt-1 text-xs text-ash-gray">
+                更新後残高 {Math.round(purchase.newBalance).toLocaleString("ja-JP")} pt
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Link
+                  href="/account"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-[100px] border border-olive-stone px-3 py-2 text-sm text-cream-glow transition-colors hover:border-cream-glow"
+                >
+                  マイページで確認
+                  <ExternalLink size={14} />
+                </Link>
+                <ShareButton
+                  label="自慢する"
+                  title="ヨソウで予測しました"
+                  text={`ヨソウで「${marketQuestion}」に${purchase.side}予測。${purchase.pointsSpent.toLocaleString(
+                    "ja-JP"
+                  )}pt投入しました。`}
+                  className="px-3 py-2"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3 mb-5">
         <button
           onClick={() => setSide("YES")}
@@ -108,23 +163,25 @@ export function BuyPanel({
       <input
         type="number"
         min={1}
-        max={Math.floor(balance)}
+        max={Math.floor(currentBalance)}
         value={points}
         onChange={(e) => setPoints(Math.max(0, Math.floor(Number(e.target.value))))}
         className="w-full bg-transparent border border-olive-stone rounded-[8px] px-4 py-3 text-cream-glow tabular-nums focus:border-cream-glow outline-none"
       />
-      <div className="flex gap-2 mt-2">
+      <div className="mt-2 flex flex-wrap gap-2">
         {[100, 500, 1000].map((v) => (
           <button
             key={v}
-            onClick={() => setPoints(v)}
-            className="text-xs text-ash-gray border border-olive-stone rounded-[100px] px-3 py-1 hover:text-cream-glow"
+            type="button"
+            onClick={() => setPoints(Math.min(v, Math.floor(currentBalance)))}
+            disabled={currentBalance < 1}
+            className="rounded-[100px] border border-olive-stone px-3 py-1 text-xs text-ash-gray hover:text-cream-glow disabled:opacity-40"
           >
             {v}
           </button>
         ))}
-        <span className="text-xs text-ash-gray ml-auto self-center">
-          残高 {Math.round(balance).toLocaleString()} pt
+        <span className="ml-auto self-center text-xs text-ash-gray">
+          残高 {Math.round(currentBalance).toLocaleString("ja-JP")} pt
         </span>
       </div>
 
@@ -139,7 +196,7 @@ export function BuyPanel({
           <div className="flex justify-between">
             <span>的中時の払い戻し</span>
             <span className="tabular-nums text-cream-glow">
-              約 {Math.round(est.contracts * 100).toLocaleString()} pt
+              約 {projectedPayout.toLocaleString("ja-JP")} pt
             </span>
           </div>
           <div className="flex justify-between">
@@ -154,14 +211,18 @@ export function BuyPanel({
 
       <button
         onClick={submit}
-        disabled={loading || points <= 0 || points > balance}
+        disabled={loading || points <= 0 || points > currentBalance}
         className="btn-ghost w-full mt-5"
       >
         {loading ? "処理中…" : "予測を確定する"}
       </button>
 
       {error && <p className="mt-3 text-sm text-ember-orange">{error}</p>}
-      {done && <p className="mt-3 text-sm text-pulse-green">{done}</p>}
+      {matchLabel && (
+        <p className="mt-3 text-xs text-ash-gray">
+          対象試合: <span className="text-cream-glow">{matchLabel}</span>
+        </p>
+      )}
     </div>
   );
 }

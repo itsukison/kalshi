@@ -4,10 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { toJapaneseError } from "@/lib/errors";
 
 export default function LoginPage() {
   const router = useRouter();
-  const supabase = createClient();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,6 +20,7 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
+      const supabase = createClient();
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email,
@@ -35,7 +36,7 @@ export default function LoginPage() {
       router.push("/");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "エラーが発生しました");
+      setError(toJapaneseError(err, "ログインに失敗しました。"));
     } finally {
       setLoading(false);
     }

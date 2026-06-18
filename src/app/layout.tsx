@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter_Tight, Noto_Sans_JP } from "next/font/google";
+import Link from "next/link";
 import "./globals.css";
 import { NavBar } from "@/components/NavBar";
 
@@ -32,12 +33,28 @@ export default function RootLayout({
           {children}
         </main>
         <footer className="hairline w-full">
-          <div className="max-w-[1280px] mx-auto px-5 md:px-8 py-8 text-ash-gray text-sm leading-relaxed">
-            <p className="bracket">遊び方</p>
-            <p className="mt-2 max-w-2xl">
-              ポイントはアプリ内のランキング専用です。購入・換金・譲渡・景品交換は一切できず、
-              現実の金銭的価値を持ちません。本サービスは賭博には該当しません。
-            </p>
+          <div className="mx-auto grid max-w-[1280px] gap-6 px-5 py-8 text-sm leading-relaxed text-ash-gray md:grid-cols-[1fr_auto] md:px-8">
+            <div>
+              <p className="bracket">遊び方</p>
+              <p className="mt-2 max-w-2xl">
+                ポイントはアプリ内のランキング専用です。購入・換金・譲渡・景品交換は一切できず、
+                現実の金銭的価値を持ちません。本サービスは賭博には該当しません。
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 md:justify-end">
+              <Link href="/privacy" className="hover:text-cream-glow">
+                プライバシー
+              </Link>
+              <Link href="/support" className="hover:text-cream-glow">
+                サポート
+              </Link>
+              <Link href="/terms" className="hover:text-cream-glow">
+                利用条件
+              </Link>
+              <a href="mailto:support@example.com" className="hover:text-cream-glow">
+                お問い合わせ
+              </a>
+            </div>
           </div>
         </footer>
       </body>

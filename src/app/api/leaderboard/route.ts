@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { toJapaneseError } from "@/lib/errors";
 
 /** GET /api/leaderboard — top 100 by points balance. */
 export async function GET() {
@@ -13,7 +14,7 @@ export async function GET() {
     .limit(100);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: toJapaneseError(error, "ランキングを取得できませんでした。") }, { status: 500 });
   }
 
   const ranked = (data ?? []).map((p, i) => ({

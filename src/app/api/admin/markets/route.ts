@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminSecret } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { initialQYes, clampPrice } from "@/lib/lmsr";
+import { toJapaneseError } from "@/lib/errors";
 
 /**
  * POST /api/admin/markets — create a market for a match.
@@ -10,7 +11,7 @@ import { initialQYes, clampPrice } from "@/lib/lmsr";
  */
 export async function POST(req: NextRequest) {
   if (!requireAdminSecret(req)) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    return NextResponse.json({ error: "管理者権限が必要です。" }, { status: 403 });
   }
   const body = await req.json().catch(() => ({}));
   const {
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
 
   if (!matchId || !question || !resolutionRule || typeof initialYesPrice !== "number") {
     return NextResponse.json(
-      { error: "matchId, question, resolutionRule, initialYesPrice are required" },
+      { error: "試合ID、質問、決済ルール、初期YES価格を指定してください。" },
       { status: 400 }
     );
   }
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     .eq("id", matchId as string)
     .single();
   if (matchErr || !match) {
-    return NextResponse.json({ error: "match not found" }, { status: 404 });
+    return NextResponse.json({ error: "対象の試合が見つかりませんでした。" }, { status: 404 });
   }
 
   const price = clampPrice(Math.round(initialYesPrice));
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ error: toJapaneseError(error, "マーケットの作成に失敗しました。") }, { status: 400 });
   }
   return NextResponse.json({ market: data });
 }

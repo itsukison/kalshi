@@ -10,12 +10,15 @@ import {
   Crown,
   Lock,
   ArrowRight,
+  ReceiptText,
+  Share2,
   type LucideIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { AccountActions } from "@/components/AccountActions";
+import { ShareButton } from "@/components/ShareButton";
 import { computeBadges, type BadgeIcon } from "@/lib/achievements";
-import { formatPoints, formatPercent } from "@/lib/format";
+import { formatJstDateTime, formatPoints, formatPercent } from "@/lib/format";
 
 const BADGE_ICONS: Record<BadgeIcon, LucideIcon> = {
   target: Target,
@@ -46,11 +49,16 @@ export default async function AccountPage() {
   const balance = Number(profile.points_balance);
 
   // Parallel: positions, rank (how many richer), trades (volume), biggest single win.
-  const [{ data: positions }, { count: richerCount }, { data: trades }, { data: wins }] =
-    await Promise.all([
+  const [
+    { data: positions },
+    { count: richerCount },
+    { data: trades },
+    { data: wins },
+    { data: ledger },
+  ] = await Promise.all([
       supabase
         .from("positions")
-        .select("side, contracts, total_cost, markets(id, question, status, resolved_outcome)")
+        .select("side, contracts, total_cost, created_at, markets(id, question, status, resolved_outcome)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false }),
       supabase
@@ -65,6 +73,12 @@ export default async function AccountPage() {
         .eq("type", "settlement_win")
         .order("amount", { ascending: false })
         .limit(1),
+      supabase
+        .from("point_ledger")
+        .select("amount, type, description, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(8),
     ]);
 
   const accuracyRatio =
@@ -75,9 +89,18 @@ export default async function AccountPage() {
   const volume = (trades ?? []).reduce((s, t) => s + Number(t.points_spent), 0);
   const biggestWin = wins && wins.length > 0 ? Number(wins[0].amount) : 0;
   const rank = (richerCount ?? 0) + 1;
-  const activeCount = (positions ?? []).filter((p) => {
+  const positionRows = positions ?? [];
+  const activeCount = positionRows.filter((p) => {
     const m = p.markets as unknown as { status: string } | null;
     return m && (m.status === "open" || m.status === "closed");
+  }).length;
+  const resolvedCount = positionRows.filter((p) => {
+    const m = p.markets as unknown as { status: string } | null;
+    return m?.status === "resolved";
+  }).length;
+  const waitingCount = positionRows.filter((p) => {
+    const m = p.markets as unknown as { status: string } | null;
+    return m?.status === "closed";
   }).length;
 
   const jstToday = new Date(
@@ -100,14 +123,24 @@ export default async function AccountPage() {
   return (
     <div className="max-w-3xl mx-auto">
       <p className="bracket text-sm text-ash-gray mb-3">マイページ</p>
-      <div className="flex items-end justify-between mb-6 flex-wrap gap-2">
+      <div className="flex items-end justify-between mb-6 flex-wrap gap-3">
         <h1 className="font-display font-semibold text-3xl tracking-tight">
           {profile.display_name ?? profile.username ?? "予測家"}
         </h1>
-        <span className="text-sm text-ash-gray">
-          総合ランク{" "}
-          <span className="font-display text-pulse-green text-lg">#{rank}</span>
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-ash-gray">
+            総合ランク{" "}
+            <span className="font-display text-pulse-green text-lg">#{rank}</span>
+          </span>
+          <ShareButton
+            label="成績をシェア"
+            title="ヨソウ成績"
+            text={`ヨソウで残高${formatPoints(balance)}pt、的中率${
+              profile.prediction_count > 0 ? formatPercent(accuracyRatio) : "計測中"
+            }。`}
+            className="px-3 py-2"
+          />
+        </div>
       </div>
 
       {/* Core stats */}
@@ -137,6 +170,12 @@ export default async function AccountPage() {
 
       <div className="card p-6 mb-8">
         <AccountActions canClaim={canClaim} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-8">
+        <FlowStat label="結果待ち" value={`${waitingCount}`} note="確認待ちマーケット" />
+        <FlowStat label="確定済み" value={`${resolvedCount}`} note="的中/不的中を確認済み" />
+        <FlowStat label="履歴" value={`${ledger?.length ?? 0}`} note="直近ポイント明細" />
       </div>
 
       {/* Achievements */}
@@ -169,10 +208,44 @@ export default async function AccountPage() {
         })}
       </div>
 
+      {/* Point ledger */}
+      <div className="flex items-center justify-between mb-3">
+        <p className="bracket text-sm text-ash-gray">ポイント履歴</p>
+        <ReceiptText size={18} className="text-ash-gray" />
+      </div>
+      <div className="card divide-y divide-olive-stone mb-8">
+        {(ledger ?? []).map((entry, i) => (
+          <div
+            key={`${entry.created_at}-${i}`}
+            className="grid grid-cols-[1fr_auto] gap-3 px-5 py-4 md:px-6"
+          >
+            <div className="min-w-0">
+              <p className="truncate text-sm">{ledgerLabel(entry.type)}</p>
+              <p className="mt-1 text-xs text-ash-gray">
+                {entry.description ?? formatJstDateTime(entry.created_at)}
+              </p>
+            </div>
+            <span
+              className={`font-display tabular-nums ${
+                Number(entry.amount) >= 0 ? "text-pulse-green" : "text-candy-pink"
+              }`}
+            >
+              {Number(entry.amount) >= 0 ? "+" : ""}
+              {formatPoints(Number(entry.amount))} pt
+            </span>
+          </div>
+        ))}
+        {(!ledger || ledger.length === 0) && (
+          <div className="px-6 py-10 text-center text-ash-gray">
+            まだポイント履歴はありません。
+          </div>
+        )}
+      </div>
+
       {/* Position history */}
       <p className="bracket text-sm text-ash-gray mb-3">ポジション履歴</p>
       <div className="card divide-y divide-olive-stone">
-        {(positions ?? []).map((p, i) => {
+        {positionRows.map((p, i) => {
           const market = p.markets as unknown as {
             id: string;
             question: string;
@@ -180,28 +253,43 @@ export default async function AccountPage() {
             resolved_outcome: string | null;
           } | null;
           const won = market?.status === "resolved" && market.resolved_outcome === p.side;
+          const pending = market?.status === "closed";
           return (
             <Link
               key={i}
               href={market ? `/market/${market.id}` : "#"}
-              className="flex items-center gap-3 px-6 py-4 hover:bg-olive-stone/20"
+              className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 px-5 py-4 hover:bg-olive-stone/20 md:grid-cols-[auto_1fr_auto_auto] md:items-center md:px-6"
             >
               <span className={p.side === "YES" ? "text-pulse-green" : "text-candy-pink"}>
                 {p.side}
               </span>
-              <span className="flex-1 truncate text-sm">{market?.question ?? "—"}</span>
-              <span className="text-xs text-ash-gray tabular-nums">
+              <span className="min-w-0 truncate text-sm">{market?.question ?? "—"}</span>
+              <span className="text-xs text-ash-gray tabular-nums md:text-right">
                 {Number(p.contracts).toFixed(2)} 枚
               </span>
-              {market?.status === "resolved" && (
-                <span className={`text-xs ${won ? "text-pulse-green" : "text-ash-gray"}`}>
-                  {won ? "的中" : "不的中"}
-                </span>
-              )}
+              <span
+                className={`text-xs ${
+                  market?.status === "resolved"
+                    ? won
+                      ? "text-pulse-green"
+                      : "text-ash-gray"
+                    : pending
+                      ? "text-ember-orange"
+                      : "text-ash-gray"
+                }`}
+              >
+                {market?.status === "resolved"
+                  ? won
+                    ? "的中"
+                    : "不的中"
+                  : pending
+                    ? "結果待ち"
+                    : "保有中"}
+              </span>
             </Link>
           );
         })}
-        {(!positions || positions.length === 0) && (
+        {positionRows.length === 0 && (
           <div className="px-6 py-10 text-center text-ash-gray">
             まだ予測はありません。{" "}
             <Link href="/" className="inline-flex items-center gap-1 text-pulse-green">
@@ -213,6 +301,18 @@ export default async function AccountPage() {
       </div>
     </div>
   );
+}
+
+const LEDGER_LABELS: Record<string, string> = {
+  signup_bonus: "新規登録ボーナス",
+  daily_bonus: "デイリーボーナス",
+  trade_spend: "予測に投入",
+  settlement_win: "的中払い戻し",
+  cancellation_refund: "キャンセル返金",
+};
+
+function ledgerLabel(type: string): string {
+  return LEDGER_LABELS[type] ?? "ポイント更新";
 }
 
 function Stat({
@@ -242,6 +342,27 @@ function Stat({
         {value}
         {unit && <span className="text-sm text-ash-gray ml-1">{unit}</span>}
       </p>
+    </div>
+  );
+}
+
+function FlowStat({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: string;
+  note: string;
+}) {
+  return (
+    <div className="card p-4">
+      <div className="flex items-center gap-2 text-xs text-ash-gray">
+        <Share2 size={14} />
+        {label}
+      </div>
+      <p className="mt-2 font-display text-3xl tabular-nums">{value}</p>
+      <p className="mt-1 text-xs text-ash-gray">{note}</p>
     </div>
   );
 }
