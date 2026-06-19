@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { LogoutButton } from "@/components/LogoutButton";
 import { MobileNav } from "@/components/MobileNav";
+import { ResultToast } from "@/components/ResultToast";
 
 export async function NavBar() {
   const supabase = await createClient();
@@ -22,7 +23,9 @@ export async function NavBar() {
   const balanceLabel = balance != null ? Math.round(balance).toLocaleString() : "—";
 
   return (
-    <nav className="sticky top-0 z-30 w-full border-b border-olive-stone bg-void-black">
+    <>
+      {user && <ResultToast />}
+      <nav className="sticky top-0 z-30 w-full border-b border-olive-stone bg-void-black">
       <div className="mx-auto flex min-h-16 max-w-[1280px] items-center justify-between gap-4 px-5 py-3 sm:py-0 md:px-8">
         {/* Logo + desktop links */}
         <div className="flex items-center gap-6">
@@ -74,5 +77,6 @@ export async function NavBar() {
         </div>
       </div>
     </nav>
+    </>
   );
 }
